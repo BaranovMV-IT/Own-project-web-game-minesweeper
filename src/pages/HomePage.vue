@@ -41,6 +41,7 @@
             exploded__cell: cellData[cell].status == 'mine_exploded'
           }"
           :style="{color: setColorByNumber(cellData[cell].value)}"
+          @mouseup="e => clickOnCell(e.button, cell)"
         >
           {{ (cellData[cell].status == "opened" && cellData[cell].value > 0) ? cellData[cell].value : "" }}
           <img 
@@ -140,6 +141,41 @@ export default {
 
       this.cellData = obj;
     },
+    clickOnCell(mouse, cell){
+      /*
+        hidden
+        opened
+        mine_exploded
+        flagged
+      */
+      if(!this.isGameOver){
+        let obj = {...this.cellData};
+
+        if(mouse == 0){
+          if(obj[cell].status != "flagged"){
+            if(!this.isGameStarted){
+              this.startTimer();
+            }
+            if(obj[cell].value == 0){
+              obj = this.openEmptyCells(cell, obj);
+            } else if(obj[cell].value > 0){
+              obj[cell].status = "opened";
+            } else {
+              obj[cell].status = "mine_exploded";
+              this.stopTimer();
+              this.isGameOver = true;
+            }
+          }
+        }
+        if(mouse == 2){
+          if(obj[cell].status == "hidden" || obj[cell].status == "flagged"){
+            obj[cell].status = obj[cell].status == "hidden" ? "flagged" : "hidden";
+          }
+        }
+
+        this.cellData = obj;
+      }
+    },
     setColorByNumber(number){
       switch(number){
         case 1:
@@ -185,6 +221,17 @@ export default {
       
       return number.split("")
     },
+    isGameWon(){
+      if(Object.keys(this.cellData).filter(id => this.cellData[id].value == -1 && this.cellData[id].status == "flagged").length == this.mineCount){
+        if(Object.keys(this.cellData).filter(id => this.cellData[id].status == "hidden").length == 0){
+          if(this.minesLeft == 0){
+            this.stopTimer();
+            this.isGameOver = true;
+            alert("Вы выиграли!");
+          }
+        }
+      }
+    },
     resetGame(){
       if(this.isGameStarted){
         this.stopTimer();
@@ -194,6 +241,35 @@ export default {
         this.fillMinesInCells();
         this.fillNumbersInCells();
       }
+    },
+    openEmptyCells(id, object, checked=[]){
+      let obj = {...object};
+      const [row, col] = id.split(",").map(Number);
+
+      if(obj[id]?.status == "hidden" && obj[id].value != -1){
+        obj[id].status = "opened";
+
+        if(obj[id].value == 0){
+          for(let newRow = row - 1; newRow <= row + 1; newRow++){
+            for(let newCol = col - 1; newCol <= col + 1; newCol++){
+              const newId = newRow.toString() + "," + newCol.toString();
+              if(obj[newId]){
+                if(!checked.includes(newId)){
+                  checked.push(newId);
+                  obj = this.openEmptyCells(newId, obj, checked);
+                }
+              }
+            }
+          }
+        }
+      }
+
+      return obj
+    }
+  },
+  watch: {
+    cellData(){
+      this.isGameWon();
     }
   },
   computed: {
